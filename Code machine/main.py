@@ -1,0 +1,49 @@
+import telebot
+import tf_keras as keras  # Импортируем tf-keras - это совместимая версия Keras для работы с .h5 моделями
+from tf_keras.models import load_model  # Загружаем функцию load_model из tf_keras, чтобы открыть модель
+from PIL import Image, ImageOps  # Installing pillow instead of PIL
+import numpy as np
+
+bot = telebot.TeleBot("8440682489:AAE-c7RFMal8IySO2b3cDuWOI7cwpINHZjI")
+
+def detect_feed(img, path_model = "keras_model.h5", path2= 'labels.txt'):
+  np.set_printoptions(suppress=True)
+  model = load_model(path_model, compile=False)
+  class_names = open(path2, "r").readlines()
+  data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
+  image = Image.open(img).convert("RGB")
+  size = (224, 224)
+  image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
+  image_array = np.asarray(image)
+  normalized_image_array = (image_array.astype(np.float32) / 127.5) - 1
+  data[0] = normalized_image_array
+  prediction = model.predict(data)
+  index = np.argmax(prediction)
+  class_name = class_names[index]
+  confidence_score = prediction[0][index]
+  return class_name[2:], confidence_score
+
+@bot.message_handler(commands=["start"])
+def send_start(message):
+    bot.send_message(message.chat.id, 'Привет, как дела?    я смогу тебе помочь , если ты что-то не знаешь напиши команду --> (/help)')
+
+@bot.message_handler(content_types=['photo'])
+def send_answer(message):
+    file_info = bot.get_file(message.photo[-1].file_id)
+    file_name = file_info.file_path.split('/')[-1]
+    downloaded_file = bot.download_file(file_info.file_path)
+    with open(file_name, 'wb') as new_file:
+        new_file.write(downloaded_file)
+    bot.send_message(message.chat.id, 'Фото получено! Начинаем анализировать...')
+    name, tochnost = detect_feed(file_name)
+    bot.send_message(message.chat.id, f'На вашей фотографии - {name} с вероятностью {tochnost}')
+
+@bot.message_handler(commands=["help"])
+def send_start(message):
+    bot.send_message(message.chat.id, 'Ку, у меня есть вот такие команды --> (/photo),(/Games)      /photo тебе нужно скинуть твое фото, и оно у меня сохрониться!')
+
+@bot.message_handler(commands=["Games"])
+def send_start(message):
+    bot.send_message(message.chat.id, 'Ку, я зделал игру подзназванием UnitFox , это специальное приложение для тех у кого нет роблокса , в эту игру могут играть вся страна , ее можно найти в гугле (играй прямо сейчас!)создал его WoodMind Даже есть телеграм группа UnitFox🦊')
+
+bot.infinity_polling()
